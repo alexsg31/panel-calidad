@@ -485,6 +485,7 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
 /* ── PESTAÑA PENDIENTES ── */
 .pend-item{display:flex;border-bottom:0.5px solid var(--linea);}
 .pend-item:last-child{border-bottom:none;}
+.pend-item.respondida{opacity:.6;background:#f8fafc;}
 .pend-barra{width:4px;flex-shrink:0;}
 .pend-barra.ap{background:var(--verde);}
 .pend-barra.an{background:var(--bad);}
@@ -1248,33 +1249,56 @@ function renderPendientes(){
     badge.style.display = totalPend > 0 ? 'inline' : 'none';
   }
 
+  // Recién confirmadas en esta visita a la pestaña — se muestran al final con check
+  var respondidasSesion = RETROS_DATA.filter(function(r){
+    var id = r.ID_EVALUACION || r.ID_GRABACION || '';
+    if(!confirmadasEnSesion.has(id)) return false;
+    if(provFil && r.PROVEEDOR !== provFil) return false;
+    return true;
+  });
+
   var cont = document.getElementById('listaPendientes');
   if(!cont) return;
 
-  if(!pendientes.length){
+  if(!pendientes.length && !respondidasSesion.length){
     cont.innerHTML = '<div class="pend-empty"><i class="ti ti-circle-check" aria-hidden="true"></i><strong style="display:block;font-size:15px;color:var(--verde-o);margin-bottom:6px;">Todo al dia</strong><span style="font-size:13px;">No hay retroalimentaciones pendientes.</span></div>';
     return;
   }
 
-  cont.innerHTML = pendientes.map(function(r, i){
-    var esAp  = r.ESTATUS === 'APROBADA';
-    var urg   = calcUrgencia(r.FECHA_AUDITORIA);
-    var idR   = r.ID_EVALUACION || r.ID_GRABACION || '';
-    var tags  = String(r.HALLAZGOS||'').split(',').map(function(t){return t.trim();}).filter(Boolean);
-    return '<div class="pend-item">'
+  function itemHTML(r, idR, tags, esAp, urg, respondida, idx){
+    return '<div class="pend-item'+(respondida?' respondida':'')+'">'
       +'<div class="pend-barra '+(esAp?'ap':'an')+'"></div>'
       +'<div class="pend-cuerpo">'
       +'<div class="pend-meta">'
       +'<span class="pend-nombre">'+r.NOMBRE_EJECUTIVO+' <span style="font-weight:400;color:var(--gris);font-size:11.5px;">'+r.COD_EJECUTIVO+' · '+r.PROVEEDOR+'</span></span>'
       +'<span class="est-badge '+(esAp?'APROBADA':'ANULADA')+'" style="justify-self:center;">'+r.ESTATUS+'</span>'
-      +'<span class="badge-urgencia '+urg+'" style="justify-self:end;">'+labelUrgencia(urg)+'</span>'
+      +(respondida?'':'<span class="badge-urgencia '+urg+'" style="justify-self:end;">'+labelUrgencia(urg)+'</span>')
       +'</div>'
       +'<div class="pend-info">'+r.FECHA_AUDITORIA+' · '+r.CAMPANA+' · '+r.CANAL
       +(tags.length?' · '+tags.join(', '):'')+'</div>'
       +(r.ID_ENCUESTA&&String(r.ID_ENCUESTA)!=='–'&&String(r.ID_ENCUESTA)!==''&&String(r.ID_ENCUESTA)!=='NaN'&&String(r.ID_ENCUESTA)!=='undefined'?'<div style="margin-top:4px;"><span style="background:#e8f0f7;border-radius:4px;padding:2px 9px;border:0.5px solid #c5d5e8;color:#15558a;font-weight:600;font-size:12px;">ID: '+String(r.ID_ENCUESTA)+'</span></div>':'')
-      +(esAdmin?'':'<button class="btn-retro" data-id="'+idR+'" data-idx="'+i+'" onclick="abrirRetroPend(event,this)">Confirmar retro</button>')
+      +(esAdmin?'':(respondida
+          ? '<button class="btn-retro confirmado" disabled>✓ Retro confirmada</button>'
+          : '<button class="btn-retro" data-id="'+idR+'" data-idx="'+idx+'" onclick="abrirRetroPend(event,this)">Confirmar retro</button>'))
       +'</div></div>';
+  }
+
+  var htmlPendientes = pendientes.map(function(r, i){
+    var esAp = r.ESTATUS === 'APROBADA';
+    var urg  = calcUrgencia(r.FECHA_AUDITORIA);
+    var idR  = r.ID_EVALUACION || r.ID_GRABACION || '';
+    var tags = String(r.HALLAZGOS||'').split(',').map(function(t){return t.trim();}).filter(Boolean);
+    return itemHTML(r, idR, tags, esAp, urg, false, i);
   }).join('');
+
+  var htmlRespondidas = respondidasSesion.map(function(r){
+    var esAp = r.ESTATUS === 'APROBADA';
+    var idR  = r.ID_EVALUACION || r.ID_GRABACION || '';
+    var tags = String(r.HALLAZGOS||'').split(',').map(function(t){return t.trim();}).filter(Boolean);
+    return itemHTML(r, idR, tags, esAp, '', true, null);
+  }).join('');
+
+  cont.innerHTML = htmlPendientes + htmlRespondidas;
 
   // Guardar pendientes para acceso desde botón
   window._pendientesActuales = pendientes;
@@ -1440,6 +1464,7 @@ const URL_AS = "https://script.google.com/macros/s/AKfycbyCOa2GVHzKDtruSq_1-_obE
 let sesion = null;
 let tabActual = 'dia';
 let retrosConfirmadas = {};
+let confirmadasEnSesion = new Set(); // retros confirmadas en esta visita a la pestaña Pendientes
 
 // ── LOGIN ────────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', e=>{ if(e.key==='Enter') login(); });
@@ -1634,6 +1659,7 @@ function recsFiltrados(){
 
 // ── TAB switch ───────────────────────────────────────────────────────────────
 function switchTab(t){
+  if(tabActual === 'pend' && t !== 'pend'){ confirmadasEnSesion.clear(); }
   tabActual=t;
   document.querySelectorAll('.seccion').forEach(s=>s.classList.remove('on'));
   document.getElementById('sec-'+t).classList.add('on');
@@ -2042,6 +2068,7 @@ async function confirmarRetro(){
 
   // Guardar localmente primero
   retrosConfirmadas[retroActual.idRetro] = conf;
+  confirmadasEnSesion.add(retroActual.idRetro);
 
   // Enviar a BD_CONFIRMACIONES en Sheets
   try{
@@ -2075,6 +2102,7 @@ async function confirmarRetro(){
 
   cerrarRetro();
   renderDia();
+  if(tabActual === 'pend') renderPendientes();
   if(sesion && !sesion.prov) renderAdminRetroPanel();
   toast('✓ Retroalimentación confirmada y registrada en Sheets','verde');
   btnConf.disabled = false; btnConf.textContent = '✓ Confirmar entrega';
