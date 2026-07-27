@@ -692,7 +692,7 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
     <button class="activo" id="btn-dia" onclick="switchTab('dia')">Auditorías del día</button>
     <button id="btn-ipsos" onclick="switchTab('ipsos')">Histórico IPSOS</button>
     <button id="btn-pend" onclick="switchTab('pend')">Pendientes<span class="tab-badge" id="badgePend" style="display:none">0</span></button>
-    <button class="prox">Tendencias<small>próximamente</small></button>
+    <button id="btn-tend" onclick="switchTab('tend')">Tendencias</button>
   </nav>
 </header>
 
@@ -937,6 +937,45 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
     </div>
     <div id="listaPendientes" style="background:var(--panel);border:1px solid var(--linea);border-radius:12px;overflow:hidden;"></div>
     <div id="listaConfirmadas" style="background:var(--panel);border:1px solid var(--linea);border-radius:12px;overflow:hidden;display:none;"></div>
+  </div>
+
+  <!-- TAB 5: TENDENCIAS -->
+  <div class="seccion" id="sec-tend">
+    <div class="caja" style="margin-bottom:16px;">
+      <div class="hist-filtros-bar">
+        <div class="hist-fil-grupo">
+          <label for="tendFilMes">Mes</label>
+          <select id="tendFilMes" class="hist-select" onchange="renderTendencias()"></select>
+        </div>
+        <div class="hist-fil-grupo" id="wrapTendProv">
+          <label for="tendFilProv">Proveedor</label>
+          <select id="tendFilProv" class="hist-select" onchange="renderTendencias()">
+            <option value="">Todos los proveedores</option>
+            <option>CHILE</option>
+            <option>COLOMBIA</option>
+            <option>MAILYN</option>
+            <option>REVERON</option>
+            <option>RISE</option>
+            <option>VICTOR</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="caja" style="margin-bottom:16px;">
+      <h2>Evolución diaria de % de aprobación</h2>
+      <div id="tend-linea-pct" style="margin-top:14px;overflow-x:auto;"></div>
+    </div>
+
+    <div class="caja" style="margin-bottom:16px;">
+      <h2>Comparativo por proveedor</h2>
+      <div id="tend-linea-prov" style="margin-top:14px;overflow-x:auto;"></div>
+    </div>
+
+    <div class="caja">
+      <h2>Tendencia de hallazgos por semana</h2>
+      <div id="tend-hallazgos" style="margin-top:14px;overflow-x:auto;"></div>
+    </div>
   </div>
 
   <!-- POPUP CARGA IPSOS -->
@@ -1604,6 +1643,7 @@ function switchTab(t){
   if(t==='ipsos') iniciarHistorico();
   if(t==='dia')   aplicar();
   if(t==='pend')  renderPendientes();
+  if(t==='tend')  iniciarTendencias();
 }
 
 // ── TAB 1: DÍA ───────────────────────────────────────────────────────────────
@@ -2413,6 +2453,188 @@ function renderHistorico(){
   window._ejecData = data;
 
 
+}
+
+
+// ── TENDENCIAS ───────────────────────────────────────────────────────────────
+const MESES_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function mesLabel(ym){
+  var p = ym.split('-');
+  return MESES_ES[parseInt(p[1],10)-1] + ' ' + p[0];
+}
+
+async function iniciarTendencias(){
+  if(!IPSOS_DATA.length){ await cargarIpsosSheets(); }
+  var meses = [...new Set(IPSOS_DATA.map(function(r){
+    var f = normFecha(r.FECHA_TX); return f ? f.slice(0,7) : null;
+  }).filter(Boolean))].sort();
+  var sel = document.getElementById('tendFilMes');
+  var actual = sel.value;
+  sel.innerHTML = meses.map(function(m){ return '<option value="'+m+'">'+mesLabel(m)+'</option>'; }).join('');
+  sel.value = meses.indexOf(actual) !== -1 ? actual : meses[meses.length-1];
+  renderTendencias();
+}
+
+function renderTendencias(){
+  var provSesion = sesion && sesion.prov ? sesion.prov : '';
+  var provSelEl = document.getElementById('tendFilProv');
+  var mesSelEl = document.getElementById('tendFilMes');
+  if(provSelEl) provSelEl.parentElement.style.display = provSesion ? 'none' : 'flex';
+  var provFil = provSesion || (provSelEl ? provSelEl.value : '');
+  var mesFil = mesSelEl ? mesSelEl.value : '';
+
+  var data = IPSOS_DATA.filter(function(r){
+    var f = normFecha(r.FECHA_TX);
+    return f && f.slice(0,7) === mesFil;
+  });
+  if(provFil) data = data.filter(function(r){ return r.PROVEEDOR_REAL === provFil; });
+
+  if(!data.length){
+    ['tend-linea-pct','tend-linea-prov','tend-hallazgos'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.innerHTML = '<div class="sin">Sin datos para este período.</div>';
+    });
+    return;
+  }
+
+  // 1) Evolución diaria de % aprobación
+  var porDia = {};
+  data.forEach(function(r){
+    var f = normFecha(r.FECHA_TX); if(!f) return;
+    var d = parseInt(f.slice(8,10),10);
+    if(!porDia[d]) porDia[d] = {ap:0, tot:0};
+    porDia[d].tot++;
+    if(r.ESTADO==='Aprobada') porDia[d].ap++;
+  });
+  var diasOrd = Object.keys(porDia).map(Number).sort(function(a,b){return a-b;});
+  var xLabelsDias = diasOrd.map(function(d){ return String(d); });
+  var serieDiaPct = diasOrd.map(function(d){
+    var o = porDia[d];
+    return o.tot ? Math.round(o.ap/o.tot*1000)/10 : 0;
+  });
+  svgLineChart('tend-linea-pct', xLabelsDias, [{nombre:'% Aprobación', color:'#15558a', valores:serieDiaPct}], {
+    yMax:100, yUnit:'%',
+    refLines:[{y:90,color:'#1fa563',label:'90% óptimo'},{y:80,color:'#a05a00',label:'80% seguimiento'}]
+  });
+
+  // 2) Comparativo por proveedor
+  var provs = provFil ? [provFil] : [...new Set(data.map(function(r){ return r.PROVEEDOR_REAL || '–'; }))].sort();
+  var paletaProv = ['#15558a','#1fa563','#b3341f','#a05a00','#6b4fa0','#0891b2'];
+  var porDiaProv = {};
+  data.forEach(function(r){
+    var f = normFecha(r.FECHA_TX); if(!f) return;
+    var d = parseInt(f.slice(8,10),10);
+    var p = r.PROVEEDOR_REAL || '–';
+    if(!porDiaProv[p]) porDiaProv[p] = {};
+    if(!porDiaProv[p][d]) porDiaProv[p][d] = {ap:0, tot:0};
+    porDiaProv[p][d].tot++;
+    if(r.ESTADO==='Aprobada') porDiaProv[p][d].ap++;
+  });
+  var seriesProv = provs.map(function(p,i){
+    var vals = diasOrd.map(function(d){
+      var o = porDiaProv[p] && porDiaProv[p][d];
+      return o && o.tot ? Math.round(o.ap/o.tot*1000)/10 : null;
+    });
+    return {nombre:p, color:paletaProv[i%paletaProv.length], valores:vals};
+  });
+  svgLineChart('tend-linea-prov', xLabelsDias, seriesProv, {yMax:100, yUnit:'%'});
+
+  // 3) Tendencia de hallazgos por semana
+  var hallTot = {};
+  data.forEach(function(r){
+    String(r.HALLAZGOS_DETECTADOS||'').split(',').map(function(t){return t.trim();}).filter(Boolean)
+      .forEach(function(t){ hallTot[t] = (hallTot[t]||0)+1; });
+  });
+  var topHallazgos = Object.entries(hallTot).sort(function(a,b){return b[1]-a[1];}).slice(0,5).map(function(e){return e[0];});
+  function semanaDe(d){ return Math.min(4, Math.floor((d-1)/7)); }
+  var porSemHall = {};
+  data.forEach(function(r){
+    var f = normFecha(r.FECHA_TX); if(!f) return;
+    var d = parseInt(f.slice(8,10),10);
+    var sem = semanaDe(d);
+    String(r.HALLAZGOS_DETECTADOS||'').split(',').map(function(t){return t.trim();}).filter(Boolean)
+      .forEach(function(t){
+        if(topHallazgos.indexOf(t)===-1) return;
+        if(!porSemHall[t]) porSemHall[t] = {};
+        porSemHall[t][sem] = (porSemHall[t][sem]||0)+1;
+      });
+  });
+  var semanasPresentes = [...new Set(diasOrd.map(semanaDe))].sort(function(a,b){return a-b;});
+  var xLabelsSem = semanasPresentes.map(function(s){ return 'Sem '+(s+1); });
+  var paletaHall = ['#15558a','#1fa563','#b3341f','#a05a00','#6b4fa0'];
+  var seriesHall = topHallazgos.map(function(h,i){
+    var vals = semanasPresentes.map(function(s){ return (porSemHall[h] && porSemHall[h][s]) || 0; });
+    return {nombre:h, color:paletaHall[i%paletaHall.length], valores:vals};
+  });
+  var maxHallVal = Math.max(1, ...seriesHall.flatMap(function(s){ return s.valores; }));
+  svgLineChart('tend-hallazgos', xLabelsSem, seriesHall, {yMax:Math.ceil(maxHallVal*1.15), yUnit:''});
+}
+
+function svgLineChart(containerId, xLabels, series, opts){
+  opts = opts || {};
+  var cont = document.getElementById(containerId);
+  if(!cont) return;
+  if(!xLabels.length || !series.length){ cont.innerHTML = '<div class="sin">Sin datos.</div>'; return; }
+
+  var padL=38, padR=16, padT=16, padB=34;
+  var stepX = xLabels.length>1 ? 44 : 120;
+  var plotW = Math.max(240, (xLabels.length-1)*stepX);
+  var W = padL+plotW+padR;
+  var H = 220;
+  var plotH = H-padT-padB;
+  var valoresPlanos = series.flatMap(function(s){ return s.valores.filter(function(v){ return v!=null; }); });
+  var yMax = opts.yMax!=null ? opts.yMax : Math.max(1, ...valoresPlanos);
+  var yMin = 0;
+
+  function xPix(i){ return padL + (xLabels.length>1 ? i*(plotW/(xLabels.length-1)) : plotW/2); }
+  function yPix(v){ return padT + plotH - ((v-yMin)/(yMax-yMin))*plotH; }
+
+  var gridSvg='';
+  var niveles=5;
+  for(var g=0; g<=niveles; g++){
+    var val = yMax*g/niveles;
+    var y = yPix(val);
+    gridSvg += '<line x1="'+padL+'" y1="'+y+'" x2="'+(padL+plotW)+'" y2="'+y+'" stroke="#e3e8ee" stroke-width="1"/>';
+    gridSvg += '<text x="'+(padL-8)+'" y="'+(y+3)+'" font-size="10" fill="#7d8a97" text-anchor="end">'+Math.round(val)+(opts.yUnit||'')+'</text>';
+  }
+
+  var refSvg='';
+  (opts.refLines||[]).forEach(function(r){
+    var y = yPix(r.y);
+    refSvg += '<line x1="'+padL+'" y1="'+y+'" x2="'+(padL+plotW)+'" y2="'+y+'" stroke="'+r.color+'" stroke-width="1.2" stroke-dasharray="4,3" opacity=".65"/>';
+    refSvg += '<text x="'+(padL+plotW-4)+'" y="'+(y-4)+'" font-size="9.5" fill="'+r.color+'" text-anchor="end" font-weight="600">'+r.label+'</text>';
+  });
+
+  var seriesSvg = series.map(function(s){
+    var pts = s.valores.map(function(v,i){ return v==null ? null : xPix(i)+','+yPix(v); }).filter(Boolean);
+    var poly = pts.length>1 ? '<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+s.color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' : '';
+    var circles = s.valores.map(function(v,i){
+      if(v==null) return '';
+      return '<circle cx="'+xPix(i)+'" cy="'+yPix(v)+'" r="3.5" fill="'+s.color+'" stroke="#fff" stroke-width="1.2"><title>'+s.nombre+' · '+xLabels[i]+': '+v+(opts.yUnit||'')+'</title></circle>';
+    }).join('');
+    return poly+circles;
+  }).join('');
+
+  var xLabelsSvg = xLabels.map(function(lbl,i){
+    return '<text x="'+xPix(i)+'" y="'+(H-10)+'" font-size="10" fill="#7d8a97" text-anchor="middle">'+lbl+'</text>';
+  }).join('');
+
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" style="display:block;min-width:'+W+'px;">'
+    + gridSvg + refSvg + seriesSvg + xLabelsSvg
+    + '<line x1="'+padL+'" y1="'+(padT+plotH)+'" x2="'+(padL+plotW)+'" y2="'+(padT+plotH)+'" stroke="#c5d5e8" stroke-width="1.2"/>'
+    + '</svg>';
+
+  var legend='';
+  if(series.length>1){
+    legend = '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--linea);">'
+      + series.map(function(s){
+          return '<span style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--tinta);">'
+            + '<span style="width:10px;height:10px;border-radius:50%;background:'+s.color+';display:inline-block;"></span>'+s.nombre+'</span>';
+        }).join('')
+      + '</div>';
+  }
+
+  cont.innerHTML = svg + legend;
 }
 
 
