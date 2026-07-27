@@ -2382,6 +2382,7 @@ function renderHistorico(){
     return '<tr>'
       +'<td><strong>'+e.nombre+'</strong></td>'
       +'<td style="font-family:monospace;font-weight:600">'+e.cod+'</td>'
+      +'<td style="font-size:11.5px;color:var(--gris)">'+e.prov+'</td>'
       +'<td style="font-size:11.5px;color:var(--gris)">'+e.camp+'</td>'
       +'<td>'+e.tot+'</td>'
       +'<td style="color:var(--verde-o);font-weight:600">'+e.ap+'</td>'
@@ -2391,7 +2392,7 @@ function renderHistorico(){
       +'</tr>';
   }).join('');
   var filaTotal='<tr class="fila-totales">'
-    +'<td colspan="3"><strong>TOTAL GENERAL</strong></td>'
+    +'<td colspan="4"><strong>TOTAL GENERAL</strong></td>'
     +'<td><strong>'+tTot+'</strong></td>'
     +'<td><strong>'+tAp+'</strong></td>'
     +'<td><strong>'+tDes+'</strong></td>'
@@ -2401,7 +2402,7 @@ function renderHistorico(){
 
   document.getElementById('hi-tabla-ejec').innerHTML=
     '<table><thead><tr>'
-    +th('nombre','Ejecutivo')+th('cod','Cod.')+th('camp','Campana')
+    +th('nombre','Ejecutivo')+th('cod','Cod.')+th('prov','Proveedor')+th('camp','Campana')
     +th('tot','Total')+th('ap','Aprobadas')+th('des','Desaprobadas')
     +th('pct','% Aprobacion')+th('hallazgo','Hallazgo frecuente')
     +'</tr></thead><tbody>'+tbody+filaTotal+'</tbody></table>';
