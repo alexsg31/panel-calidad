@@ -2070,15 +2070,12 @@ async function confirmarRetro(){
   const hora = now.toLocaleDateString('es-VE',{day:'2-digit',month:'2-digit',year:'numeric'}) + ' ' +
                now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
   const conf = { hora, supervisor: sesion.rol, nota };
+  const idRetro = retroActual.idRetro;
 
-  // Guardar localmente primero
-  retrosConfirmadas[retroActual.idRetro] = conf;
-  confirmadasEnSesion.add(retroActual.idRetro);
-
-  // Enviar a BD_CONFIRMACIONES en Sheets
+  // Enviar a BD_CONFIRMACIONES en Sheets — solo se marca como confirmada si esto realmente funciona
   try{
     const r = retroActual.rec;
-    await fetch(URL_AS, {
+    const res = await fetch(URL_AS, {
       method: 'POST',
       headers: {'Content-Type': 'text/plain;charset=utf-8'},
       body: JSON.stringify({
@@ -2087,7 +2084,7 @@ async function confirmarRetro(){
           fecha_confirmacion: hora,
           supervisor: sesion.rol,
           usuario: sesion.usuario,
-          id_evaluacion: retroActual.idRetro,
+          id_evaluacion: idRetro,
           id_grabacion: r.ID_GRABACION || '',
           cod_ejecutivo: r.COD_EJECUTIVO || '',
           nombre_ejecutivo: r.NOMBRE_EJECUTIVO || '',
@@ -2100,16 +2097,24 @@ async function confirmarRetro(){
         }
       })
     });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const rj = await res.json();
+    if(!rj.ok) throw new Error(rj.error || 'Sheets no confirmó el guardado');
+
+    // Recién ahora, con el guardado verificado, se marca como confirmada
+    retrosConfirmadas[idRetro] = conf;
+    confirmadasEnSesion.add(idRetro);
+
+    cerrarRetro();
+    renderDia();
+    if(tabActual === 'pend') renderPendientes();
+    if(sesion && !sesion.prov) renderAdminRetroPanel();
+    toast('✓ Retroalimentación confirmada y registrada en Sheets','verde');
   }catch(err){
     console.warn('No se pudo guardar confirmación en Sheets:', err);
-    // No bloqueamos — la confirmación local ya fue guardada
+    toast('✕ No se pudo guardar en Sheets. La retro sigue pendiente — intenta de nuevo.','rojo');
   }
 
-  cerrarRetro();
-  renderDia();
-  if(tabActual === 'pend') renderPendientes();
-  if(sesion && !sesion.prov) renderAdminRetroPanel();
-  toast('✓ Retroalimentación confirmada y registrada en Sheets','verde');
   btnConf.disabled = false; btnConf.textContent = '✓ Confirmar entrega';
 }
 
