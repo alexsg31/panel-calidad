@@ -1546,32 +1546,8 @@ async function cargarDatos(){
       if(rE.ok && rE.ejecutivos) EJECUTIVOS = rE.ejecutivos;
     }catch(e){ console.warn('No se pudieron cargar ejecutivos:', e); }
 
-    // Calcular última carga
-    const badge = document.getElementById('ultimaCargaBadge');
-    if(IPSOS_DATA.length){
-      // Mostrar info del reporte IPSOS cargado en BD
-      var origenes = [...new Set(IPSOS_DATA.map(function(r){return r.ORIGEN||'';}))].filter(Boolean).join(' + ');
-      // Obtener la fecha más reciente del reporte
-      var fechas = IPSOS_DATA.map(function(r){
-        var f = String(r.FECHA_TX||'').slice(0,10);
-        // Convertir DD-MM-YYYY a YYYY-MM-DD para ordenar correctamente
-        if(f.match(/^\d{2}-\d{2}-\d{4}$/)){
-          var p = f.split('-'); f = p[2]+'-'+p[1]+'-'+p[0];
-        }
-        return f;
-      }).filter(Boolean).sort();
-      var fechaMaxRaw = fechas.length ? fechas[fechas.length-1] : '–';
-      // Mostrar en formato legible DD-MM-YYYY
-      var fechaMax = fechaMaxRaw !== '–' ? fechaMaxRaw.split('-').reverse().join('-') : '–';
-      badge.innerHTML = '<i class="ti ti-clock" style="font-size:13px;vertical-align:-1px;"></i> Reporte IPSOS en BD: <strong>' + origenes + '</strong> · ' + IPSOS_DATA.length + ' evaluaciones · Última fecha: <strong>' + fechaMax + '</strong>';
-      badge.style.display = 'block';
-    } else {
-      badge.textContent = 'No hay reporte IPSOS cargado en BD — carga el archivo para ver el histórico.';
-      badge.style.background = '#fff6e0';
-      badge.style.color = '#a05a00';
-      badge.style.borderColor = '#f0d9ae';
-      badge.style.display = 'block';
-    }
+    // Calcular última carga (filtrada por proveedor si aplica — única fuente de verdad)
+    actualizarBadgeIpsos();
 
     estadoEl.style.display = 'none';
     filtrosEl.style.display = 'flex';
