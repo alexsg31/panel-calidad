@@ -189,6 +189,9 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
 .retro-hallazgos-tags span{background:#fff;color:var(--bad);border:1.5px solid #f5c4b3;border-radius:5px;padding:2px 9px;margin:2px 4px 2px 0;font-size:11.5px;font-weight:600;display:inline-block}
 .retro-aprobada-banner{padding:10px 18px;background:var(--verde-s);border-bottom:2px solid #bfe5cf;font-size:12.5px;color:var(--verde-o);font-weight:500;display:none}
 .retro-aprobada-banner.ver{display:block}
+.retro-observaciones{padding:10px 18px;background:#f8fafc;border-bottom:2px solid var(--linea)}
+.retro-observaciones-tit{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--azul-2);margin-bottom:6px}
+.retro-observaciones-txt{font-size:12.5px;line-height:1.65;white-space:pre-wrap;color:var(--tinta)}
 .retro-body{padding:16px 18px}
 .retro-body label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--azul-2);display:block;margin-bottom:7px}
 .retro-body textarea{width:100%;height:110px;resize:vertical;border:2px solid var(--linea);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;color:var(--tinta);background:#f8fafc;line-height:1.65}
@@ -1033,6 +1036,10 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
     <div class="retro-aprobada-banner" id="rAprobadaBanner">
       ✓ Evaluación aprobada — refuerza lo positivo al bajar esta retroalimentación al ejecutivo
     </div>
+    <div class="retro-observaciones">
+      <div class="retro-observaciones-tit">📝 Observaciones de la analista</div>
+      <div class="retro-observaciones-txt" id="rObservacionesTxt"></div>
+    </div>
     <div class="retro-body">
       <label>¿Qué se hizo en la sesión de retroalimentación?</label>
       <textarea id="rNota" placeholder="Ej: Se escuchó el audio con el ejecutivo. Se explicó el hallazgo de No Sondea. El ejecutivo entendió que debe profundizar siempre con ¿A qué se refiere con...? Quedó comprometido a aplicarlo..."></textarea>
@@ -1276,6 +1283,7 @@ function renderPendientes(){
       +'</div>'
       +'<div class="pend-info">'+r.FECHA_AUDITORIA+' · '+r.CAMPANA+' · '+r.CANAL
       +(tags.length?' · '+tags.join(', '):'')+'</div>'
+      +(r.OBSERVACIONES?'<div class="obs-txt" style="margin-top:6px;">'+String(r.OBSERVACIONES).split('|').map(function(o){return '• '+o.trim();}).join('\n')+'</div>':'')
       +(r.ID_ENCUESTA&&String(r.ID_ENCUESTA)!=='–'&&String(r.ID_ENCUESTA)!==''&&String(r.ID_ENCUESTA)!=='NaN'&&String(r.ID_ENCUESTA)!=='undefined'?'<div style="margin-top:4px;"><span style="background:#e8f0f7;border-radius:4px;padding:2px 9px;border:0.5px solid #c5d5e8;color:#15558a;font-weight:600;font-size:12px;">ID: '+String(r.ID_ENCUESTA)+'</span></div>':'')
       +(esAdmin?'':(respondida
           ? '<button class="btn-retro confirmado" disabled>✓ Retro confirmada</button>'
@@ -2017,6 +2025,9 @@ function abrirRetro(e, idRetro, rec){
   } else {
     hallDiv.classList.remove('ver'); aprobBanner.classList.remove('ver');
   }
+  // Observaciones completas de la analista
+  const obsTxt = rec.OBSERVACIONES ? String(rec.OBSERVACIONES).split('|').map(t=>'• '+t.trim()).join('\n') : '';
+  document.getElementById('rObservacionesTxt').innerHTML = obsTxt || '<i style="color:var(--gris)">Sin observaciones.</i>';
   // Hora actual
   const now = new Date();
   document.getElementById('rHora').textContent = sesion.rol + ' · ' +
