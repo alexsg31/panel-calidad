@@ -170,6 +170,9 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
 .btn-retro{background:#fff;border:1.5px solid var(--azul-2);border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;color:var(--azul-2);cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s}
 .btn-retro:hover{background:var(--azul-2);color:#fff}
 .btn-retro.confirmado{background:var(--verde-s);border-color:var(--verde);color:var(--verde-o);cursor:default}
+.btn-eliminar-audit{background:#fff;border:1.5px solid var(--bad);border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;color:var(--bad);cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .15s}
+.btn-eliminar-audit:hover{background:var(--bad);color:#fff}
+.btn-eliminar-audit:disabled{opacity:.6;cursor:default}
 
 /* OVERLAY POPUP */
 #retroOverlay{display:none;position:fixed;inset:0;background:rgba(10,20,35,0.65);z-index:999;align-items:center;justify-content:center;padding:16px}
@@ -792,7 +795,7 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
         <select id="filtroProvRetro" onchange="filtrarRetros()" style="margin-left:auto">
           <option value="">Todos los proveedores</option>
           <option>CHILE</option><option>COLOMBIA</option><option>MAILYN</option>
-          <option>REVERON</option><option>RISE</option><option>VICTOR</option>
+          <option>REVERON</option><option>RISE</option><option>VICTOR</option><option>ISA</option>
         </select>
       </div>
       <div id="listaAdminRetros"></div>
@@ -843,6 +846,7 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
           <option>REVERON</option>
           <option>RISE</option>
           <option>VICTOR</option>
+          <option>ISA</option>
         </select>
       </div>
       <div class="hist-fil-grupo">
@@ -928,6 +932,7 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
           <button class="pill-pend" data-fil="prov" data-val="REVERON">Reveron</button>
           <button class="pill-pend" data-fil="prov" data-val="RISE">Rise</button>
           <button class="pill-pend" data-fil="prov" data-val="VICTOR">Victor</button>
+          <button class="pill-pend" data-fil="prov" data-val="ISA">Isa</button>
         </div>
         <!-- Pills urgencia -->
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:center;">
@@ -967,6 +972,7 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
             <option>REVERON</option>
             <option>RISE</option>
             <option>VICTOR</option>
+            <option>ISA</option>
           </select>
         </div>
       </div>
@@ -1101,6 +1107,11 @@ footer{max-width:1280px;margin:0 auto;padding:0 16px 28px;font-size:11.5px;color
           <td><span class="pass-usuario">victor</span></td>
           <td><span class="pass-valor" onclick="copiarPass(this,'Vic.2026#')" title="Clic para copiar">Vic.2026#</span></td>
           <td><span class="pass-rol">Victor</span></td>
+        </tr>
+        <tr>
+          <td><span class="pass-usuario">isa</span></td>
+          <td><span class="pass-valor" onclick="copiarPass(this,'Isa.2026#')" title="Clic para copiar">Isa.2026#</span></td>
+          <td><span class="pass-rol">Isa</span></td>
         </tr>
       </tbody>
     </table>
@@ -1462,6 +1473,7 @@ const CREDS = {
   'rise':     { pass:'Ris.2026#',     rol:'Rise',            prov:'RISE' },
   'chile':    { pass:'Chi.2026#',     rol:'Chile',           prov:'CHILE' },
   'colombia': { pass:'Col.2026#',     rol:'Colombia',        prov:'COLOMBIA' },
+  'isa':      { pass:'Isa.2026#',     rol:'Isa',             prov:'ISA' },
 };
 
 let RETROS_DATA = []; // Se carga en vivo desde BD_RETROS
@@ -1582,7 +1594,7 @@ function renderProvFiltro(){
       <div><span class="prov-fijo">${sesion.rol}</span></div>`;
   } else {
     // Admin: pills seleccionables
-    const provs = ['TODOS','CHILE','COLOMBIA','MAILYN','REVERON','RISE','VICTOR'];
+    const provs = ['TODOS','CHILE','COLOMBIA','MAILYN','REVERON','RISE','VICTOR','ISA'];
     cont.innerHTML = `<span style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--azul-2);display:block;margin-bottom:5px">Proveedor</span>
       <div class="pills">${provs.map(p=>`<button class="pill${p==='TODOS'?' on':''}" onclick="selProv(this,'${p}')">${p}</button>`).join('')}</div>`;
   }
@@ -1827,6 +1839,10 @@ function renderTarjetas(base){
 
       const confBadge = confirmada ? '<span style="background:var(--verde-s);color:var(--verde-o);border-radius:5px;padding:2px 8px;font-size:10.5px;font-weight:600;">✓ Retro entregada</span>' : '';
 
+      const btnEliminar = esAdmin
+        ? '<button class="btn-eliminar-audit" onclick="eliminarAuditoria(event,\''+idRetro+'\',this)" title="Eliminar esta auditoría (solo admin)">🗑️ Eliminar</button>'
+        : '';
+
       detalleHTML += '<details class="tarjeta">'
         + '<summary>'
         + '<span class="quien" style="font-size:13px">'+( r.CAMPANA||'–')+' <span style="font-weight:400;color:var(--gris)">· '+(r.CANAL||'–')+' · '+(r.FECHA_ENCUESTA||'–')+'</span></span>'
@@ -1837,7 +1853,7 @@ function renderTarjetas(base){
         + '<div class="ids-row">ID Eval: <b>'+(r.ID_EVALUACION||'–')+'</b> &nbsp;·&nbsp; ID Grab: <b>'+(r.ID_GRABACION||'–')+'</b> &nbsp;·&nbsp; ID Encuesta: <b>'+(r.ID_ENCUESTA&&String(r.ID_ENCUESTA)!=='NaN'&&String(r.ID_ENCUESTA)!=='undefined'?String(r.ID_ENCUESTA):'–')+'</b> &nbsp;·&nbsp; Auditor: <b>'+(r.AUDITOR||'–')+'</b></div>'
         + tagsHTML
         + '<div class="obs-txt">'+(obs||'<i style="color:var(--gris)">Sin observaciones.</i>')+'</div>'
-        + '<div class="retro-footer">'+estadoRetro+btnRetro+'</div>'
+        + '<div class="retro-footer">'+estadoRetro+btnRetro+btnEliminar+'</div>'
         + '</div>'
         + '</details>';
     });
@@ -2042,6 +2058,44 @@ function abrirRetro(e, idRetro, rec){
 function cerrarRetro(){
   document.getElementById('retroOverlay').classList.remove('ver');
   retroActual = null;
+}
+
+// ── ELIMINAR AUDITORÍA (solo admin) ────────────────────────────────────────────
+async function eliminarAuditoria(e, idRetro, btn){
+  e.stopPropagation();
+  if(!sesion || sesion.prov) return; // solo NewLead Admin
+
+  var rec = RETROS_DATA.find(function(r){ return idRetroDe(r) === idRetro; });
+  if(!rec) return;
+
+  var detalle = (rec.NOMBRE_EJECUTIVO||'(sin nombre)')+' · '+(rec.CAMPANA||'–')+' · '+(rec.FECHA_AUDITORIA||'–')+' · '+rec.ESTATUS;
+  var ok = window.confirm('¿Eliminar esta auditoría de forma permanente?\n\n'+detalle+'\n\nEsta acción no se puede deshacer y también borrará su confirmación de retro si ya existía.');
+  if(!ok) return;
+
+  btn.disabled = true; btn.textContent = 'Eliminando...';
+
+  try{
+    const res = await fetch(URL_AS, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({ tipo: 'eliminar_retro', id_retro: idRetro })
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const rj = await res.json();
+    if(!rj.ok) throw new Error(rj.error || 'No se pudo eliminar');
+
+    RETROS_DATA = RETROS_DATA.filter(function(r){ return idRetroDe(r) !== idRetro; });
+    delete retrosConfirmadas[idRetro];
+    confirmadasEnSesion.delete(idRetro);
+
+    renderDia();
+    if(tabActual === 'pend') renderPendientes();
+    toast('✓ Auditoría eliminada','verde');
+  }catch(err){
+    console.warn('No se pudo eliminar la auditoría:', err);
+    toast('✕ No se pudo eliminar. Intenta de nuevo.','rojo');
+    btn.disabled = false; btn.textContent = '🗑️ Eliminar';
+  }
 }
 
 async function confirmarRetro(){
