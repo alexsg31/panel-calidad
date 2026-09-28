@@ -1298,6 +1298,14 @@ function renderPendientes(){
   }
 
   function itemHTML(r, idR, tags, esAp, urg, respondida, idx){
+    var btnCambiarEstatus = '';
+    if(esAdmin){
+      if(r.ESTATUS === 'ANULADA'){
+        btnCambiarEstatus = '<button class="btn-cambiar-estatus aprobar" onclick="cambiarEstatusAuditoria(event,\''+idR+'\',\'APROBADA\',this)" title="Marcar como Aprobada (solo admin)">✓ Marcar Aprobada</button>';
+      } else if(r.ESTATUS === 'APROBADA'){
+        btnCambiarEstatus = '<button class="btn-cambiar-estatus anular" onclick="cambiarEstatusAuditoria(event,\''+idR+'\',\'ANULADA\',this)" title="Marcar como Anulada (solo admin)">✕ Marcar Anulada</button>';
+      }
+    }
     return '<div class="pend-item'+(respondida?' respondida':'')+'">'
       +'<div class="pend-barra '+(esAp?'ap':'an')+'"></div>'
       +'<div class="pend-cuerpo">'
@@ -1310,9 +1318,12 @@ function renderPendientes(){
       +(tags.length?' · '+tags.join(', '):'')+'</div>'
       +(r.OBSERVACIONES?'<div class="obs-txt" style="margin-top:6px;">'+String(r.OBSERVACIONES).split('|').map(function(o){return '• '+o.trim();}).join('\n')+'</div>':'')
       +(r.ID_ENCUESTA&&String(r.ID_ENCUESTA)!=='–'&&String(r.ID_ENCUESTA)!==''&&String(r.ID_ENCUESTA)!=='NaN'&&String(r.ID_ENCUESTA)!=='undefined'?'<div style="margin-top:4px;"><span style="background:#e8f0f7;border-radius:4px;padding:2px 9px;border:0.5px solid #c5d5e8;color:#15558a;font-weight:600;font-size:12px;">ID: '+String(r.ID_ENCUESTA)+'</span></div>':'')
-      +(esAdmin?'':(respondida
+      +(btnCambiarEstatus||!esAdmin?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">'
+        +btnCambiarEstatus
+        +(esAdmin?'':(respondida
           ? '<button class="btn-retro confirmado" disabled>✓ Retro confirmada</button>'
           : '<button class="btn-retro" data-id="'+idR+'" data-idx="'+idx+'" onclick="abrirRetroPend(event,this)">Confirmar retro</button>'))
+        +'</div>':'')
       +'</div></div>';
   }
 
