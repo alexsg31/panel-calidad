@@ -1159,6 +1159,7 @@ function renderConfirmadas(){
   var cont = document.getElementById('listaConfirmadas');
   if(!cont) return;
   var provFil = sesion && sesion.prov ? sesion.prov : (_filtProv||'');
+  var esAdmin = sesion && !sesion.prov;
 
   var confs = Object.entries(retrosConfirmadas).map(function(e){
     var id  = e[0];
@@ -1185,6 +1186,16 @@ function renderConfirmadas(){
     var c   = item.conf;
     var esAp = r.ESTATUS === 'APROBADA';
     var tags = String(r.HALLAZGOS||'').split(',').map(function(t){return t.trim();}).filter(Boolean);
+
+    var btnCambiarEstatus = '';
+    if(esAdmin){
+      if(r.ESTATUS === 'ANULADA'){
+        btnCambiarEstatus = '<button class="btn-cambiar-estatus aprobar" onclick="cambiarEstatusAuditoria(event,\''+item.id+'\',\'APROBADA\',this)" title="Marcar como Aprobada (solo admin)">✓ Marcar Aprobada</button>';
+      } else if(r.ESTATUS === 'APROBADA'){
+        btnCambiarEstatus = '<button class="btn-cambiar-estatus anular" onclick="cambiarEstatusAuditoria(event,\''+item.id+'\',\'ANULADA\',this)" title="Marcar como Anulada (solo admin)">✕ Marcar Anulada</button>';
+      }
+    }
+
     return '<div class="conf-item">'
       +'<div class="conf-barra"></div>'
       +'<div class="conf-cuerpo">'
@@ -1201,6 +1212,7 @@ function renderConfirmadas(){
       +(c.nota?'<span style="color:var(--gris);font-size:11px;font-style:italic;"> · '+c.nota.slice(0,60)+(c.nota.length>60?'…':'')+'</span>':'')
       +'<span class="fecha">'+(c.hora||'')+'</span>'
       +'</div>'
+      +(btnCambiarEstatus?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">'+btnCambiarEstatus+'</div>':'')
       +'</div>'
       +'</div>';
   }).join('');
@@ -2161,7 +2173,10 @@ async function cambiarEstatusAuditoria(e, idRetro, nuevoEstatus, btn){
 
     rec.ESTATUS = nuevoEstatus;
     renderDia();
-    if(tabActual === 'pend') renderPendientes();
+    if(tabActual === 'pend'){
+      if(_subPestActual === 'conf') renderConfirmadas();
+      else renderPendientes();
+    }
     toast('✓ Estatus actualizado a '+nuevoEstatus,'verde');
   }catch(err){
     console.warn('No se pudo actualizar el estatus:', err);
